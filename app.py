@@ -12,7 +12,7 @@ def get_trend():
         return jsonify({"error": "No keyword provided"}), 400
 
     try:
-        time.sleep(2)  # ← helps avoid Google Trends 429 rate limit
+        time.sleep(2)  # Avoid Google Trends rate limit
 
         pytrends.build_payload([keyword], cat=0, timeframe='today 3-m', geo='', gprop='')
         data = pytrends.interest_over_time()
@@ -20,9 +20,13 @@ def get_trend():
         if data.empty:
             return jsonify({"keyword": keyword, "error": "No data"}), 404
 
-        trend_data = data[keyword].dropna().to_dict()
+        # FIX: convert keys to str to avoid JSON error
+        trend_data = {
+            str(k): int(v) for k, v in data[keyword].dropna().items()
+        }
+
         return jsonify({"keyword": keyword, "trend": trend_data})
-    
+
     except Exception as e:
         return jsonify({"keyword": keyword, "error": str(e)}), 500
 
