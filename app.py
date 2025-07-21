@@ -7,28 +7,32 @@ pytrends = TrendReq(hl='en-US', tz=360)
 
 @app.route('/trend', methods=['GET'])
 def get_trend():
-    keyword = request.args.get('keyword')
-    if not keyword:
-        return jsonify({"error": "No keyword provided"}), 400
+    keywords = request.args.getlist('keyword')  # Now supports ?keyword[]=A&keyword[]=B...
+
+    if not keywords:
+        return jsonify({"error": "No keyword(s) provided"}), 400
+
+    results = []
 
     try:
-        time.sleep(2)  # Avoid Google Trends rate limit
+        for keyword in keywords:
+            time.sleep(1.5)  # Conservative delay to avoid Google Trends rate limits
 
-        pytrends.build_payload([keyword], cat=0, timeframe='today 3-m', geo='', gprop='')
-        data = pytrends.interest_over_time()
+            pytrends.build_payload([keyword], cat=0, timeframe='today 3-m', geo='', gprop='')
+            data = pytrends.interest_over_time()
 
-        if data.empty:
-            return jsonify({"keyword": keyword, "error": "No data"}), 404
+            if data.empty:
+                results.append({"keyword": keyword, "error": "No data"})
+            else:
+                trend_data = {
+                    str(k): int(v) for k, v in data[keyword].dropna().items()
+                }
+                results.append({"keyword": keyword, "trend": trend_data})
 
-        # FIX: convert keys to str to avoid JSON error
-        trend_data = {
-            str(k): int(v) for k, v in data[keyword].dropna().items()
-        }
-
-        return jsonify({"keyword": keyword, "trend": trend_data})
+        return jsonify(results)
 
     except Exception as e:
-        return jsonify({"keyword": keyword, "error": str(e)}), 500
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port=10000)
